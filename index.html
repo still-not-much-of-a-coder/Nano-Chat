@@ -2089,38 +2089,7 @@
     });
   }
 
-  // ----- Copy full source code (for export) -----
-  const $ipCopyCode = document.getElementById("ipCopyCode");
-  if($ipCopyCode){
-    $ipCopyCode.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try{
-        const r = await fetch(window.location.href, { cache:"no-store" });
-        const src = await r.text();
-        const ok = await copyToClipboard(src);
-        if(ok){
-          $ipCopyCode.textContent = "✓ Copied " + Math.round(src.length/1024) + " KB";
-          showStatus("Source code copied to clipboard");
-        } else {
-          $ipCopyCode.textContent = "✕ Copy failed";
-          showStatus("Copy failed — clipboard blocked");
-        }
-        setTimeout(()=>{ $ipCopyCode.textContent = "📋 Copy full source code"; }, 2500);
-      }catch(err){
-        // fallback: copy the live DOM if we can't re-fetch the page
-        try{
-          const src = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
-          const ok = await copyToClipboard(src);
-          $ipCopyCode.textContent = ok ? "✓ Copied (DOM)" : "✕ Copy failed";
-          showStatus(ok ? "Source code copied (DOM snapshot)" : "Copy failed");
-          setTimeout(()=>{ $ipCopyCode.textContent = "📋 Copy full source code"; }, 2500);
-        }catch(e2){
-          $ipCopyCode.textContent = "✕ Failed: "+(err.message||err);
-          setTimeout(()=>{ $ipCopyCode.textContent = "📋 Copy full source code"; }, 3000);
-        }
-      }
-    });
-  }
+  
 
   // ----- Settings: IP storage toggle -----
   const $ipToggle = document.getElementById("ipToggle");
