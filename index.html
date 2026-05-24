@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Nano Global Chat</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0d14;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;color:#e6e9f0;user-select:none;-webkit-user-select:none;touch-action:none}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+
+  /* background layers */
+  #bg{position:fixed;inset:0;z-index:0;background:#0a0d14;overflow:hidden}
+  #bgFx{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s}
+  #bgFx.on{opacity:1}
+  /* blur-gradient effect */
+  #bgFx.fx-blur::before,
+  #bgFx.fx-blur::after{
+    content:"";position:absolute;border-radius:50%;filter:blur(60px);opacity:.55;
+  }
+  #bgFx.fx-blur::before{width:60vw;height:60vw;left:-15vw;top:10vh;background:var(--fx1,#3b82f6)}
+  #bgFx.fx-blur::after {width:55vw;height:55vw;right:-15vw;bottom:5vh;background:var(--fx2,#6366f1)}
+  /* aurora streaks */
+  #bgFx.fx-aurora{
+    background:
+      radial-gradient(60vw 40vh at 20% 25%, var(--fx1,#3b82f6) 0%, transparent 60%),
+      radial-gradient(50vw 35vh at 80% 60%, var(--fx2,#a855f7) 0%, transparent 60%),
+      radial-gradient(40vw 30vh at 50% 90%, var(--fx3,#06b6d4) 0%, transparent 60%);
+    filter:blur(40px);opacity:.7;
+  }
+  /* doodle dots */
+  #bgFx.fx-doodle{
+    background-image:
+      radial-gradient(circle at 10% 20%, var(--fx1,#fff) 1.5px, transparent 2px),
+      radial-gradient(circle at 80% 15%, var(--fx2,#fff) 1px, transparent 1.5px),
+      radial-gradient(circle at 25% 75%, var(--fx1,#fff) 1.2px, transparent 1.8px),
+      radial-gradient(circle at 70% 85%, var(--fx2,#fff) 1.5px, transparent 2px),
+      radial-gradient(circle at 50% 45%, var(--fx1,#fff) 1px, transparent 1.5px),
+      radial-gradient(circle at 90% 50%, var(--fx2,#fff) 1.3px, transparent 1.8px),
+      radial-gradient(circle at 15% 55%, var(--fx2,#fff) 1px, transparent 1.5px);
+    background-size:180px 180px;opacity:.18;
+  }
+  /* grid */
+  #bgFx.fx-grid{
+    background-image:
+      linear-gradient(var(--fx1,rgba(255,255,255,.06)) 1px, transparent 1px),
+      linear-gradient(90deg, var(--fx1,rgba(255,255,255,.06)) 1px, transparent 1px);
+    background-size:32px 32px;opacity:.5;
+  }
+  /* mesh shapes */
+  #bgFx.fx-mesh{
+    background:
+      conic-gradient(from 30deg at 30% 30%, var(--fx1,#3b82f6) 0deg, transparent 90deg),
+      conic-gradient(from 200deg at 70% 70%, var(--fx2,#a855f7) 0deg, transparent 90deg);
+    filter:blur(50px);opacity:.55;
+  }
+  /* stars */
+  #bgFx.fx-stars{
+    background-image:
+      radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+      radial-gradient(1px 1px at 60px 100px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 120px 50px, #fff, transparent),
+      radial-gradient(1px 1px at 180px 130px, #fff, transparent),
+      radial-gradient(1px 1px at 90px 160px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 30px 140px, #fff, transparent),
+      radial-gradient(1px 1px at 150px 20px, #fff, transparent);
+    background-size:200px 200px;opacity:.6;
+  }
+
+  /* HEADER pinned inside safe zone */
+  #header{
+    position:absolute;left:0;right:0;top:14vh;
+    height:48px;display:flex;align-items:center;padding:0 14px;gap:10px;
+    background:rgba(16,20,30,.72);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-bottom:1px solid rgba(255,255,255,.06);
+    z-index:5;
+  }
+  #header .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  #header .title{font-size:15px;font-weight:600;letter-spacing:-.2px;color:#f1f5f9}
+  #header .sub{font-size:11px;color:#94a3b8;margin-left:auto;font-weight:500;display:flex;align-items:center;gap:6px}
+  #header .count{
+    font-size:11px;color:#cbd5e1;padding:3px 8px;
+    background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);
+    border-radius:6px;font-weight:600;font-variant-numeric:tabular-nums;
+  }
+  #header .count.loading{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.08);color:#94a3b8}
+  #header .me{
+    font-size:11px;color:#cbd5e1;padding:5px 10px;
+    border:1px solid rgba(255,255,255,.08);border-radius:7px;
+    background:rgba(255,255,255,.04);font-weight:600;cursor:pointer;
+    transition:background .15s,border-color .15s;
+  }
+  #header .me:active{background:rgba(255,255,255,.08)}
+  #header .me .devtag{
+    display:inline-block;margin-left:5px;padding:1px 5px;
+    font-size:9px;font-weight:800;letter-spacing:.5px;
+    background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;
+    border-radius:4px;vertical-align:middle;
+    box-shadow:0 0 8px rgba(245,158,11,.5);
+  }
+  .msg .who .devtag{
+    display:inline-block;margin-left:4px;padding:1px 4px;
+    font-size:8px;font-weight:800;letter-spacing:.4px;
+    background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;
+    border-radius:3px;vertical-align:middle;
+    box-shadow:0 0 6px rgba(245,158,11,.4);
+  }
+  .msg.sys.dev-join{
+    color:#fbbf24;font-weight:700;font-size:12px;
+    text-shadow:0 0 10px rgba(245,158,11,.4);
+  }
+  .msg.dev-target{outline:2px solid rgba(245,158,11,.6);outline-offset:1px}
+  .msg .who.dev-clickable{cursor:pointer}
+  .msg.muted-hidden{display:none}
+
+  /* reply quote */
+  .msg .quote{
+    display:block;border-left:2px solid currentColor;
+    padding:3px 8px;margin:0 0 5px;border-radius:4px;
+    background:rgba(255,255,255,.08);
+    font-size:11px;line-height:1.35;opacity:.85;cursor:pointer;
+    max-width:100%;overflow:hidden;
+  }
+  .msg .quote .qn{font-weight:700;display:block;font-size:10.5px;opacity:.9}
+  .msg .quote .qt{
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  .msg.me .quote{background:rgba(255,255,255,.18)}
+  .msg .quote.flash{animation:qflash .6s ease-out}
+  @keyframes qflash{0%{background:rgba(255,255,255,.45)}100%{background:rgba(255,255,255,.08)}}
+
+  /* reply composer banner */
+  #replyBar{
+    position:absolute;left:0;right:0;bottom:calc(12vh + 56px);
+    padding:6px 12px 6px 14px;
+    background:rgba(16,20,30,.92);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-top:1px solid rgba(255,255,255,.06);
+    display:none;align-items:center;gap:8px;z-index:5;
+    border-left:3px solid #3b82f6;
+  }
+  #replyBar.show{display:flex}
+  #replyBar .info{flex:1;min-width:0;overflow:hidden}
+  #replyBar .info .a{font-size:10.5px;color:#94a3b8;font-weight:600}
+  #replyBar .info .a b{color:#cbd5e1}
+  #replyBar .info .b{
+    font-size:11.5px;color:#e2e8f0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  #replyBar .x{
+    width:28px;height:28px;border:none;border-radius:8px;
+    background:rgba(255,255,255,.08);color:#cbd5e1;
+    font-size:16px;cursor:pointer;flex-shrink:0;
+  }
+  #replyBar .x:active{background:rgba(255,255,255,.15)}
+
+  /* dev action sheet */
+  #devSheet{
+    position:absolute;left:0;right:0;bottom:0;top:0;
+    z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(5,7,12,.7);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  }
+  #devSheet.show{display:flex}
+  #devSheet .card{
+    width:84%;max-width:320px;
+    background:rgba(20,25,38,.97);border:1px solid rgba(245,158,11,.3);
+    border-radius:14px;padding:16px;
+    box-shadow:0 0 30px rgba(245,158,11,.15);
+  }
+  #devSheet h3{
+    font-size:13px;font-weight:700;color:#fbbf24;
+    margin-bottom:4px;letter-spacing:.3px;
+  }
+  body.is-dev #devSheet h3{
+    display:flex;align-items:center;gap:6px;
+  }
+  body.is-dev #devSheet h3::before{content:"⚡"}
+  body:not(.is-dev) #devSheet h3{color:#cbd5e1}
+  body:not(.is-dev) #devSheet .card{border-color:rgba(255,255,255,.1);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+  #devSheet .info{
+    font-size:11px;color:#94a3b8;margin-bottom:12px;
+    word-break:break-word;line-height:1.4;
+  }
+  #devSheet .preview{
+    font-size:12px;color:#cbd5e1;background:rgba(0,0,0,.3);
+    border:1px solid rgba(255,255,255,.06);border-radius:8px;
+    padding:8px 10px;margin-bottom:12px;max-height:80px;overflow:auto;
+    font-style:italic;
+  }
+  #devSheet button{
+    width:100%;border:none;border-radius:10px;padding:11px;
+    font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;
+    margin-top:6px;transition:filter .15s,transform .1s;
+  }
+  #devSheet button:active{transform:scale(.97);filter:brightness(.9)}
+  #devSheet button.b-reply{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff}
+  #devSheet .b-del{background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff}
+  #devSheet .b-mute{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3) !important}
+  #devSheet .b-cancel{background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.08) !important}
+
+  /* IP hash row in nickname modal */
+  #ipHashRow{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);display:none}
+  #ipHashRow.show{display:block}
+  #ipHashRow .lbl-mini{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+  #ipHashRow .hashbox{
+    background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);
+    border-radius:8px;padding:8px 10px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:10.5px;color:#cbd5e1;word-break:break-all;line-height:1.4;
+    cursor:pointer;transition:background .15s;
+  }
+  #ipHashRow .hashbox:active{background:rgba(0,0,0,.55)}
+  #ipHashRow .hashbox.empty{color:#64748b;font-style:italic;font-family:inherit;font-size:11px}
+  #ipHashRow .hashhint{font-size:10px;color:#64748b;margin-top:6px;line-height:1.4}
+  #ipHashRow .hashhint code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;color:#94a3b8;background:rgba(255,255,255,.05);padding:1px 4px;border-radius:3px}
+
+  /* dev section in nickname modal */
+  #devSect{display:none;margin-top:12px;padding-top:12px;border-top:1px solid rgba(245,158,11,.2)}
+  #devSect.show{display:block}
+  #devSect .lbl{font-size:10px;color:#fbbf24;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+  #devSect button{
+    width:100%;border:none;border-radius:10px;padding:10px;
+    font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;
+    background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff;
+    transition:filter .15s,transform .1s;
+  }
+  #devSect button:active{transform:scale(.97);filter:brightness(.9)}
+  #devSect button.confirming{background:linear-gradient(135deg,#dc2626,#7f1d1d);animation:pulse-warn 1s infinite}
+  @keyframes pulse-warn{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+
+  /* MESSAGES area */
+  #messages{
+    position:absolute;left:0;right:0;
+    top:calc(14vh + 48px);
+    bottom:calc(12vh + 56px);
+    overflow-y:auto;overflow-x:hidden;
+    padding:12px 12px 8px;
+    -webkit-overflow-scrolling:touch;
+    scroll-behavior:smooth;
+    z-index:2;
+  }
+  #messages::-webkit-scrollbar{width:0}
+
+  .msg{
+    margin:5px 0;max-width:80%;padding:8px 12px;border-radius:14px;
+    font-size:14px;line-height:1.4;word-wrap:break-word;overflow-wrap:anywhere;
+    animation:pop .22s ease-out;position:relative;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .msg .who{font-size:11px;font-weight:600;letter-spacing:.1px;margin-bottom:3px}
+  .msg .time{font-size:10px;opacity:.55;margin-left:6px;font-weight:400}
+  .msg.them{
+    background:rgba(30,36,50,.78);color:#e6e9f0;
+    border:1px solid rgba(255,255,255,.06);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border-bottom-left-radius:4px;margin-right:auto;
+  }
+  .msg.me{
+    background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;
+    border-bottom-right-radius:4px;margin-left:auto;
+    box-shadow:0 2px 12px rgba(59,130,246,.25);
+  }
+  .msg.me .time{opacity:.75;color:#e0e7ff}
+  .msg.sys{background:transparent;color:#64748b;font-size:11px;text-align:center;max-width:100%;padding:4px;font-weight:500}
+  .msg.sys.join{font-style:italic;opacity:.55;font-size:10.5px;font-weight:400}
+  .msg.sys.welcome{
+    background:rgba(59,130,246,.08);
+    border:1px solid rgba(59,130,246,.18);
+    color:#cbd5e1;
+    border-radius:12px;
+    padding:10px 14px;
+    text-align:left;
+    font-size:12px;
+    line-height:1.5;
+    margin:6px auto 12px;
+    max-width:92%;
+    font-weight:500;
+  }
+  .msg.sys.welcome b{color:#f1f5f9;font-weight:700}
+  .msg.sys.welcome a,
+  .msg.sys.discord a{
+    color:#8b9eff;text-decoration:none;font-weight:700;
+    border-bottom:1px dashed rgba(139,158,255,.45);
+    pointer-events:auto;
+  }
+  .msg.sys.welcome a:active,
+  .msg.sys.discord a:active{color:#a5b4fc}
+  .msg.sys.discord{
+    font-style:italic;opacity:.7;font-size:11px;font-weight:400;
+    color:#94a3b8;margin:2px auto 6px;
+  }
+  #charCount{
+    position:absolute;right:14px;bottom:calc(12vh + 60px);
+    font-size:10px;color:#64748b;font-weight:600;
+    background:rgba(16,20,30,.8);padding:2px 7px;border-radius:6px;
+    pointer-events:none;z-index:5;opacity:0;transition:opacity .15s;
+    font-variant-numeric:tabular-nums;
+  }
+  #charCount.show{opacity:1}
+  #charCount.warn{color:#fbbf24}
+  #charCount.over{color:#ef4444}
+
+  #msgs-wrap{display:flex;flex-direction:column}
+
+  /* TYPING INDICATOR */
+  #typing{
+    position:absolute;left:0;right:0;bottom:calc(12vh + 56px);
+    padding:4px 16px 6px;
+    font-size:11px;color:#94a3b8;font-weight:500;
+    background:linear-gradient(to top, rgba(16,20,30,.55), transparent);
+    pointer-events:none;z-index:4;
+    min-height:20px;
+    opacity:0;transition:opacity .2s;
+    display:flex;align-items:center;gap:6px;
+    font-style:italic;
+  }
+  #typing.show{opacity:1}
+  #typing .dots{display:inline-flex;gap:2px;margin-left:2px}
+  #typing .dots span{
+    width:3px;height:3px;border-radius:50%;background:#94a3b8;
+    animation:tdot 1.2s infinite;
+  }
+  #typing .dots span:nth-child(2){animation-delay:.15s}
+  #typing .dots span:nth-child(3){animation-delay:.3s}
+  @keyframes tdot{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+
+  /* COMPOSER */
+  #composer{
+    position:absolute;left:0;right:0;bottom:12vh;
+    padding:10px 12px;
+    background:rgba(16,20,30,.78);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-top:1px solid rgba(255,255,255,.06);
+    display:flex;gap:8px;align-items:center;z-index:5;
+  }
+  #input{
+    flex:1;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.08);border-radius:12px;
+    padding:11px 14px;color:#f1f5f9;font-size:14px;outline:none;
+    font-family:inherit;min-width:0;transition:border-color .15s,background .15s;
+  }
+  #input::placeholder{color:#64748b}
+  #input:focus{border-color:#3b82f6;background:rgba(255,255,255,.08)}
+  #send{
+    width:44px;height:44px;border-radius:12px;border:none;
+    background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;
+    font-size:18px;font-weight:600;cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .1s,filter .15s;
+    box-shadow:0 4px 14px rgba(59,130,246,.35);
+  }
+  #send:active{transform:scale(.94);filter:brightness(.9)}
+  #send:disabled{opacity:.45}
+  #plus{
+    width:40px;height:40px;border-radius:11px;border:1px solid rgba(255,255,255,.08);
+    background:rgba(255,255,255,.05);color:#cbd5e1;
+    font-size:22px;font-weight:300;cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .1s,background .15s;line-height:1;
+  }
+  #plus:active{transform:scale(.94);background:rgba(255,255,255,.1)}
+  #plus.open{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent}
+
+  /* MEDIA PANEL */
+  #media{
+    position:absolute;left:0;right:0;bottom:calc(12vh + 56px + 8px);
+    height:0;overflow:hidden;
+    background:rgba(16,20,30,.92);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-top:1px solid rgba(255,255,255,.06);
+    border-bottom:1px solid rgba(255,255,255,.06);
+    z-index:5;transition:height .25s ease;
+    display:flex;flex-direction:column;
+  }
+  #media.open{height:48vh}
+  #media .search{padding:10px 10px 8px;flex-shrink:0;display:flex;gap:6px}
+  #media .search input{
+    flex:1;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.08);border-radius:8px;
+    padding:8px 12px;color:#f1f5f9;font-size:13px;outline:none;font-family:inherit;
+  }
+  #media .search input:focus{border-color:#3b82f6}
+  #media .grid{
+    flex:1;overflow-y:auto;overflow-x:hidden;padding:2px 10px 10px;
+    -webkit-overflow-scrolling:touch;
+  }
+  #media .grid::-webkit-scrollbar{width:0}
+  #media .cols{
+    display:flex;gap:8px;width:100%;
+  }
+  #media .col{
+    flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px;
+  }
+  #media .gif{
+    width:100%;border-radius:10px;overflow:hidden;
+    background:rgba(255,255,255,.04);cursor:pointer;position:relative;
+    border:1px solid rgba(255,255,255,.05);
+    display:block;
+    transition:transform .1s;
+  }
+  #media .gif img{width:100%;height:auto;display:block}
+  #media .gif:active{transform:scale(.97)}
+  #media .empty{
+    width:100%;text-align:center;color:#64748b;font-size:12px;padding:30px 10px;
+  }
+  #media .attrib{font-size:9px;color:#475569;text-align:center;padding:0 0 6px;flex-shrink:0}
+  #media .tabs{
+    display:flex;gap:6px;padding:10px 10px 4px;flex-shrink:0;
+    border-bottom:1px solid rgba(255,255,255,.05);
+  }
+  #media .tab{
+    flex:1;background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.06);color:#94a3b8;
+    border-radius:8px;padding:8px 10px;font-size:12px;font-weight:600;
+    font-family:inherit;cursor:pointer;transition:background .15s,color .15s;
+  }
+  #media .tab:active{transform:scale(.97)}
+  #media .tab.active{
+    background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent;
+  }
+  #media .pane{flex:1;display:none;flex-direction:column;min-height:0}
+  #media .pane.active{display:flex}
+  #themePane{padding:12px 12px 10px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #themePane::-webkit-scrollbar{width:0}
+  #settingsPane{padding:14px 14px 10px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #settingsPane::-webkit-scrollbar{width:0}
+  #settingsPane .sect-label{font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin:0 2px 8px}
+  #settingsPane .setting-row{
+    display:flex;align-items:center;gap:12px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:10px;padding:11px 12px;
+  }
+  #settingsPane .setting-info{flex:1;min-width:0}
+  #settingsPane .setting-title{font-size:13px;font-weight:600;color:#f1f5f9;margin-bottom:3px}
+  #settingsPane .setting-desc{font-size:11px;color:#94a3b8;line-height:1.4}
+  #settingsPane .setting-about{font-size:11px;color:#64748b;line-height:1.5;padding:2px 4px}
+  #settingsPane .toggle{
+    flex-shrink:0;width:44px;height:26px;border-radius:13px;border:none;
+    background:rgba(255,255,255,.12);position:relative;cursor:pointer;
+    transition:background .2s;padding:0;
+  }
+  #settingsPane .toggle .knob{
+    position:absolute;top:3px;left:3px;width:20px;height:20px;
+    border-radius:50%;background:#f1f5f9;transition:left .2s,background .2s;
+  }
+  #settingsPane .toggle[aria-checked="true"]{background:linear-gradient(135deg,#3b82f6,#6366f1)}
+  #settingsPane .toggle[aria-checked="true"] .knob{left:21px}
+  #themePane .sect-label{font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin:4px 2px 8px}
+  #themePane .theme-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;
+  }
+  #themePane .tcard{
+    position:relative;border-radius:10px;padding:10px 10px 9px;
+    border:1.5px solid rgba(255,255,255,.08);cursor:pointer;
+    overflow:hidden;transition:transform .1s,border-color .15s;
+    min-height:54px;
+  }
+  #themePane .tcard:active{transform:scale(.97)}
+  #themePane .tcard.sel{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.15)}
+  #themePane .tcard .tname{
+    font-size:12px;font-weight:700;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.5);position:relative;z-index:2;
+  }
+  #themePane .tcard .bubs{
+    display:flex;gap:4px;margin-top:6px;position:relative;z-index:2;
+  }
+  #themePane .tcard .bub{
+    height:8px;border-radius:4px;
+  }
+  #themePane .tcard .bub.a{width:28px;background:rgba(255,255,255,.45)}
+  #themePane .tcard .bub.b{width:20px;margin-left:auto}
+  #themePane .bg-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+  }
+  #themePane .bgcard{
+    aspect-ratio:1;border-radius:10px;cursor:pointer;padding:0;
+    border:2px solid rgba(255,255,255,.1);
+    transition:transform .1s,border-color .15s;
+    position:relative;overflow:hidden;
+  }
+  #themePane .bgcard:active{transform:scale(.93)}
+  #themePane .bgcard.sel{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.2)}
+  #themePane .bgcard .lbl{
+    position:absolute;left:0;right:0;bottom:0;
+    font-size:9px;font-weight:600;color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,.7);
+    padding:2px 0 3px;text-align:center;
+    background:linear-gradient(to top,rgba(0,0,0,.5),transparent);
+  }
+
+  /* GIF message */
+  .msg.gif-msg{padding:4px;background:rgba(30,36,50,.78);border:1px solid rgba(255,255,255,.06)}
+  .msg.gif-msg.me{background:linear-gradient(135deg,#3b82f6,#6366f1);box-shadow:0 2px 12px rgba(59,130,246,.25)}
+  .msg .gif-img{
+    display:block;max-width:220px;width:100%;border-radius:10px;
+    background:rgba(0,0,0,.2);
+  }
+  .msg.gif-msg .who{padding:4px 6px 0}
+  .msg.gif-msg .time{padding:2px 6px 4px}
+
+  #status{
+    position:absolute;top:calc(14vh + 48px + 6px);
+    left:50%;transform:translateX(-50%);
+    background:rgba(16,20,30,.9);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;
+    font-size:10px;padding:5px 12px;border-radius:8px;z-index:6;
+    opacity:0;transition:opacity .3s;pointer-events:none;
+    backdrop-filter:blur(10px);font-weight:500;
+  }
+  #status.show{opacity:1}
+
+  /* NICKNAME MODAL */
+  #modal{
+    position:absolute;inset:0;z-index:50;
+    background:rgba(5,7,12,.75);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding-top:22vh;
+    opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  #modal.show{opacity:1;pointer-events:auto}
+  #ipModal{
+    position:absolute;inset:0;z-index:55;
+    background:rgba(5,7,12,.78);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding-top:22vh;
+    opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  #ipModal.show{opacity:1;pointer-events:auto}
+  #ipModal .card{
+    width:88%;max-width:340px;
+    background:rgba(20,25,38,.95);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:16px;padding:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  #ipModal h2{font-size:17px;font-weight:600;color:#f1f5f9;margin-bottom:6px}
+  #ipModal p{font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.5}
+  #ipModal .row{display:flex;gap:8px}
+  #ipModal button{
+    flex:1;border:none;border-radius:10px;padding:11px;
+    font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+    transition:filter .15s,transform .1s;
+  }
+  #ipModal button:active{transform:scale(.97);filter:brightness(.9)}
+  #ipDeny{background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.08)}
+  #ipAllow{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;box-shadow:0 4px 14px rgba(59,130,246,.3)}
+  #modal .card{
+    width:88%;max-width:340px;
+    background:rgba(20,25,38,.95);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:16px;padding:20px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    transform:translateY(-10px);transition:transform .25s;
+  }
+  #modal.show .card{transform:translateY(0)}
+  #modal h2{font-size:17px;font-weight:600;color:#f1f5f9;margin-bottom:6px}
+  #modal p{font-size:12px;color:#94a3b8;margin-bottom:14px;line-height:1.4}
+  #nickInput{
+    width:100%;background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.1);border-radius:10px;
+    padding:11px 14px;color:#f1f5f9;font-size:15px;outline:none;
+    font-family:inherit;transition:border-color .15s;
+  }
+  #nickInput:focus{border-color:#3b82f6}
+  #nickInput::placeholder{color:#475569}
+  #modal .row{display:flex;gap:8px;margin-top:12px}
+  #modal button{
+    flex:1;border:none;border-radius:10px;padding:11px;
+    font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;
+    transition:filter .15s,transform .1s;
+  }
+  #modal button:active{transform:scale(.97)}
+  #nickRandom{background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.08) !important}
+  #nickSave{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;box-shadow:0 4px 14px rgba(59,130,246,.3)}
+  #nickSave:active,#nickRandom:active{filter:brightness(.9)}
+  #nickHint{font-size:11px;color:#64748b;margin-top:10px;text-align:center}
+
+  #modal .divider{height:1px;background:rgba(255,255,255,.07);margin:16px 0 12px}
+
+  .sect-label{font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+
+  /* THEMES — each theme drives background, header text, and bubbles */
+  /* Modern (default) */
+  body[data-theme="modern"] #bg{background:#0a0d14}
+  body[data-theme="modern"] #header .title{color:#f1f5f9}
+  body[data-theme="modern"] .msg.me{
+    background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;
+    box-shadow:0 2px 12px rgba(59,130,246,.25);
+  }
+  body[data-theme="modern"] #send,
+  body[data-theme="modern"] #nickSave,
+  body[data-theme="modern"] #plus.open,
+  body[data-theme="modern"] #media .tab.active,
+  body[data-theme="modern"] #themePane .tcard.sel{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff}
+
+  /* Stylized */
+  body[data-theme="stylized"] #bg{background:#1a0f2e}
+  body[data-theme="stylized"] #header .title{color:#fce7f3}
+  body[data-theme="stylized"] .msg.me{
+    background:linear-gradient(135deg,#f472b6,#a855f7);color:#fff;
+    box-shadow:0 2px 14px rgba(168,85,247,.35);
+  }
+  body[data-theme="stylized"] .msg.them{
+    background:rgba(45,30,60,.78);border-color:rgba(244,114,182,.18);color:#fce7f3;
+  }
+  body[data-theme="stylized"] #send,
+  body[data-theme="stylized"] #nickSave,
+  body[data-theme="stylized"] #plus.open,
+  body[data-theme="stylized"] #media .tab.active,
+  body[data-theme="stylized"] #themePane .tcard.sel{background:linear-gradient(135deg,#f472b6,#a855f7);color:#fff}
+  body[data-theme="stylized"] #input:focus{border-color:#a855f7}
+
+  /* Midnight */
+  body[data-theme="midnight"] #bg{background:linear-gradient(160deg,#020617,#0c1a2e)}
+  body[data-theme="midnight"] #header .title{color:#bae6fd}
+  body[data-theme="midnight"] .msg.me{
+    background:linear-gradient(135deg,#0ea5e9,#0369a1);color:#fff;
+    box-shadow:0 2px 12px rgba(14,165,233,.3);
+  }
+  body[data-theme="midnight"] .msg.them{background:rgba(15,23,42,.78);color:#e0f2fe;border-color:rgba(14,165,233,.15)}
+  body[data-theme="midnight"] #send,
+  body[data-theme="midnight"] #nickSave,
+  body[data-theme="midnight"] #plus.open,
+  body[data-theme="midnight"] #media .tab.active,
+  body[data-theme="midnight"] #themePane .tcard.sel{background:linear-gradient(135deg,#0ea5e9,#0369a1);color:#fff}
+
+  /* Sunset */
+  body[data-theme="sunset"] #bg{background:linear-gradient(160deg,#1a0a0a,#3b1414)}
+  body[data-theme="sunset"] #header .title{color:#fed7aa}
+  body[data-theme="sunset"] .msg.me{
+    background:linear-gradient(135deg,#fb923c,#ef4444);color:#fff;
+    box-shadow:0 2px 12px rgba(251,146,60,.3);
+  }
+  body[data-theme="sunset"] .msg.them{background:rgba(60,25,15,.78);color:#fed7aa;border-color:rgba(251,146,60,.18)}
+  body[data-theme="sunset"] #send,
+  body[data-theme="sunset"] #nickSave,
+  body[data-theme="sunset"] #plus.open,
+  body[data-theme="sunset"] #media .tab.active,
+  body[data-theme="sunset"] #themePane .tcard.sel{background:linear-gradient(135deg,#fb923c,#ef4444);color:#fff}
+  body[data-theme="sunset"] #input:focus{border-color:#fb923c}
+
+  /* Forest */
+  body[data-theme="forest"] #bg{background:linear-gradient(160deg,#0a1a16,#143b2c)}
+  body[data-theme="forest"] #header .title{color:#a7f3d0}
+  body[data-theme="forest"] .msg.me{
+    background:linear-gradient(135deg,#10b981,#047857);color:#fff;
+    box-shadow:0 2px 12px rgba(16,185,129,.3);
+  }
+  body[data-theme="forest"] .msg.them{background:rgba(15,40,30,.78);color:#d1fae5;border-color:rgba(16,185,129,.18)}
+  body[data-theme="forest"] #send,
+  body[data-theme="forest"] #nickSave,
+  body[data-theme="forest"] #plus.open,
+  body[data-theme="forest"] #media .tab.active,
+  body[data-theme="forest"] #themePane .tcard.sel{background:linear-gradient(135deg,#10b981,#047857);color:#fff}
+  body[data-theme="forest"] #input:focus{border-color:#10b981}
+
+  /* Mono */
+  body[data-theme="mono"] #bg{background:#0a0a0a}
+  body[data-theme="mono"] #header .title{color:#f1f5f9}
+  body[data-theme="mono"] .msg.me{
+    background:#e2e8f0;color:#0f172a;box-shadow:0 2px 12px rgba(0,0,0,.3);
+  }
+  body[data-theme="mono"] .msg.me .time{color:#475569;opacity:.7}
+  body[data-theme="mono"] .msg.them{background:rgba(30,30,30,.78);color:#f1f5f9;border-color:rgba(255,255,255,.08)}
+  body[data-theme="mono"] #send,
+  body[data-theme="mono"] #nickSave,
+  body[data-theme="mono"] #plus.open,
+  body[data-theme="mono"] #media .tab.active,
+  body[data-theme="mono"] #themePane .tcard.sel{background:#e2e8f0;color:#0f172a}
+  body[data-theme="mono"] #input:focus{border-color:#e2e8f0}
+
+  /* Rose */
+  body[data-theme="rose"] #bg{background:linear-gradient(160deg,#1c0a15,#3b0a2e)}
+  body[data-theme="rose"] #header .title{color:#fbcfe8}
+  body[data-theme="rose"] .msg.me{
+    background:linear-gradient(135deg,#fb7185,#be185d);color:#fff;
+    box-shadow:0 2px 12px rgba(251,113,133,.3);
+  }
+  body[data-theme="rose"] .msg.them{background:rgba(50,15,35,.78);color:#fbcfe8;border-color:rgba(251,113,133,.18)}
+  body[data-theme="rose"] #send,
+  body[data-theme="rose"] #nickSave,
+  body[data-theme="rose"] #plus.open,
+  body[data-theme="rose"] #media .tab.active,
+  body[data-theme="rose"] #themePane .tcard.sel{background:linear-gradient(135deg,#fb7185,#be185d);color:#fff}
+</style>
+</head>
+<body>
+<div id="bg"><div id="bgFx"></div></div>
+<div id="app">
+  <div id="header">
+    <div class="dot"></div>
+    <div class="title">Global Chat</div>
+    <div class="sub"><span id="online">connecting…</span><span class="count loading" id="active">· · ·</span></div>
+    <div class="me" id="meName">…</div>
+  </div>
+  <div id="status"></div>
+  <div id="messages"><div id="msgs-wrap"></div></div>
+  <div id="typing"></div>
+  <div id="charCount">0/240</div>
+  <div id="media">
+    <div class="tabs">
+      <button class="tab active" data-tab="gif">GIFs</button>
+      <button class="tab" data-tab="theme">Theme</button>
+      <button class="tab" data-tab="settings">Settings</button>
+    </div>
+    <div class="pane active" id="gifPane">
+      <div class="search">
+        <input id="gifSearch" type="text" placeholder="Search GIFs…" autocomplete="off" autocorrect="off" autocapitalize="none">
+      </div>
+      <div class="grid" id="gifGrid"></div>
+      <div class="attrib">Powered by GIPHY</div>
+    </div>
+    <div class="pane" id="themePane">
+      <div class="sect-label">Theme</div>
+      <div class="theme-grid">
+        <button class="tcard" data-theme="modern" style="background:linear-gradient(135deg,#3b82f6,#6366f1)">
+          <div class="tname">Modern</div>
+          <div class="bubs"><div class="bub a"></div><div class="bub b" style="background:rgba(255,255,255,.85)"></div></div>
+        </button>
+        <button class="tcard" data-theme="stylized" style="background:linear-gradient(135deg,#f472b6,#a855f7)">
+          <div class="tname">Stylized</div>
+          <div class="bubs"><div class="bub a"></div><div class="bub b" style="background:rgba(255,255,255,.85)"></div></div>
+        </button>
+        <button class="tcard" data-theme="midnight" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)">
+          <div class="tname">Midnight</div>
+          <div class="bubs"><div class="bub a"></div><div class="bub b" style="background:rgba(255,255,255,.85)"></div></div>
+        </button>
+        <button class="tcard" data-theme="sunset" style="background:linear-gradient(135deg,#fb923c,#ef4444)">
+          <div class="tname">Sunset</div>
+          <div class="bubs"><div class="bub a"></div><div class="bub b" style="background:rgba(255,255,255,.85)"></div></div>
+        </button>
+        <button class="tcard" data-theme="forest" style="background:linear-gradient(135deg,#10b981,#047857)">
+          <div class="tname">Forest</div>
+          <div class="bubs"><div class="bub a"></div><div class="bub b" style="background:rgba(255,255,255,.85)"></div></div>
+        </button>
+        <button class="tcard" data-theme="rose" style="background:linear-gradient(135deg,#fb7185,#be185d)">
+          <div class="tname">Rose</div>
+          <div class="bubs"><div class="bub a"></div><div class="bub b" style="background:rgba(255,255,255,.85)"></div></div>
+        </button>
+        <button class="tcard" data-theme="mono" style="background:linear-gradient(135deg,#475569,#1e293b)">
+          <div class="tname">Mono</div>
+          <div class="bubs"><div class="bub a" style="background:#e2e8f0"></div><div class="bub b" style="background:rgba(255,255,255,.5)"></div></div>
+        </button>
+      </div>
+      <div class="sect-label">Background effect</div>
+      <div class="bg-grid">
+        <button class="bgcard" data-fx="none"   style="background:#0a0d14"><span class="lbl">None</span></button>
+        <button class="bgcard" data-fx="blur"   style="background:radial-gradient(circle at 25% 30%,#3b82f6 0%,transparent 55%),radial-gradient(circle at 80% 75%,#a855f7 0%,transparent 55%),#0a0d14"><span class="lbl">Blur</span></button>
+        <button class="bgcard" data-fx="aurora" style="background:radial-gradient(ellipse at 20% 25%,#3b82f6 0%,transparent 60%),radial-gradient(ellipse at 80% 60%,#a855f7 0%,transparent 60%),radial-gradient(ellipse at 50% 90%,#06b6d4 0%,transparent 60%),#0a0d14"><span class="lbl">Aurora</span></button>
+        <button class="bgcard" data-fx="mesh"   style="background:conic-gradient(from 30deg at 30% 30%,#3b82f6,transparent 25%),conic-gradient(from 200deg at 70% 70%,#a855f7,transparent 25%),#0a0d14"><span class="lbl">Mesh</span></button>
+        <button class="bgcard" data-fx="doodle" style="background-image:radial-gradient(circle at 25% 30%,#fff 1.5px,transparent 2px),radial-gradient(circle at 70% 60%,#fff 1.5px,transparent 2px),radial-gradient(circle at 50% 85%,#fff 1.2px,transparent 1.8px);background-color:#0a0d14;background-size:30px 30px"><span class="lbl">Doodle</span></button>
+        <button class="bgcard" data-fx="grid"   style="background-image:linear-gradient(rgba(255,255,255,.2) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.2) 1px,transparent 1px);background-color:#0a0d14;background-size:14px 14px"><span class="lbl">Grid</span></button>
+        <button class="bgcard" data-fx="stars"  style="background-image:radial-gradient(1px 1px at 10px 12px,#fff,transparent),radial-gradient(1px 1px at 25px 35px,#fff,transparent),radial-gradient(1.5px 1.5px at 45px 18px,#fff,transparent),radial-gradient(1px 1px at 55px 50px,#fff,transparent);background-color:#0a0d14;background-size:70px 70px"><span class="lbl">Stars</span></button>
+      </div>
+    </div>
+    <div class="pane" id="settingsPane">
+      <div class="sect-label">Privacy</div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-title">Remember me on this network</div>
+          <div class="setting-desc">Store a one-way hash of your IP so your nickname can be suggested next time on this Wi-Fi.</div>
+        </div>
+        <button class="toggle" id="ipToggle" role="switch" aria-checked="false"><span class="knob"></span></button>
+      </div>
+      <div class="sect-label" style="margin-top:14px">About</div>
+      <div class="setting-about">Nano Global Chat · v2<br>Real-time chat shared with everyone on Nanogram.</div>
+    </div>
+  </div>
+  <div id="replyBar">
+    <div class="info">
+      <div class="a">Replying to <b id="replyName"></b></div>
+      <div class="b" id="replyText"></div>
+    </div>
+    <button class="x" id="replyCancel" aria-label="Cancel reply">✕</button>
+  </div>
+  <div id="composer">
+    <button id="plus" aria-label="Add media">+</button>
+    <input id="input" type="text" placeholder="Type a message…" maxlength="240" autocomplete="off" autocorrect="on" autocapitalize="sentences">
+    <button id="send" aria-label="Send">➤</button>
+  </div>
+  <div id="ipModal">
+    <div class="card">
+      <h2>Remember me on this network?</h2>
+      <p>Nano Global Chat can suggest your nickname on this Wi-Fi/network next time, so you don't have to retype it. We store a one-way hash of your IP — never the IP itself — alongside your chosen nickname.</p>
+      <div class="row">
+        <button id="ipDeny">No thanks</button>
+        <button id="ipAllow">Allow</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="ipCopyCode" style="background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3)">📋 Copy full source code</button>
+      </div>
+      <div id="nickHint">You can change this anytime by reopening this prompt.</div>
+    </div>
+  </div>
+  <div id="modal">
+    <div class="card">
+      <h2>Choose your nickname</h2>
+      <p>This is how others will see you in chat. You can change it anytime by tapping your name.</p>
+      <input id="nickInput" type="text" placeholder="e.g. Cosmic Otter" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="words">
+      <div class="row">
+        <button id="nickRandom">🎲 Random</button>
+        <button id="nickSave">Save</button>
+      </div>
+      <div id="devSect">
+        <div class="lbl">⚡ Developer tools</div>
+        <button id="resetBtn">🗑 Reset entire chat history</button>
+      </div>
+    </div>
+  </div>
+  <div id="devSheet">
+    <div class="card">
+      <h3 id="devTitle">Message actions</h3>
+      <div class="info" id="devInfo"></div>
+      <div class="preview" id="devPreview"></div>
+      <button class="b-reply" id="devReply">↩ Reply</button>
+      <button class="b-del" id="devDel" style="display:none">Delete this message</button>
+      <button class="b-mute" id="devMute" style="display:none">Mute user</button>
+      <button class="b-cancel" id="devCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Try both region URLs — newer projects often live on firebasedatabase.app (us-central1 / europe-west1 / asia-southeast1)
+  const IP_API = "https://api.ipify.org?format=json";
+  const IPS_PATH = "/ips";
+  const DB_CANDIDATES = [
+    "https://nano-global-chat-v2-default-rtdb.firebaseio.com",
+    "https://nano-global-chat-v2-default-rtdb.europe-west1.firebasedatabase.app",
+    "https://nano-global-chat-v2-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "https://nano-global-chat-v2-default-rtdb.us-central1.firebasedatabase.app"
+  ];
+  let DB = DB_CANDIDATES[0];
+  const PATH = "/messages";
+  const DELETED = "/deleted";
+  const PRESENCE = "/presence";
+  const TYPING = "/typing";
+  const PRESENCE_TTL = 30000; // a user is "active" if their heartbeat is < 30s old
+  const HEARTBEAT_MS = 10000;
+  const TYPING_TTL = 9000;   // a user is "typing" if their last keystroke was < 9s ago
+  const TYPING_PING_MS = 4000; // re-assert typing every 4s while text remains in the box
+  const TYPING_IDLE_CLEAR = 8000; // clear typing if no keystrokes for 8s
+  const LIMIT = 60;
+
+  let dbResolved = false;
+  async function resolveDB(){
+    if(dbResolved) return true;
+    for(const base of DB_CANDIDATES){
+      try{
+        const r = await fetch(`${base}/.json?shallow=true`, { method:"GET" });
+        if(r.ok || r.status === 401 || r.status === 403){
+          // 200 = readable, 401/403 = exists but locked (still the right URL)
+          DB = base;
+          dbResolved = true;
+          return true;
+        }
+      }catch(e){ /* try next */ }
+    }
+    return false;
+  }
+
+  // ----- identity -----
+  const ADJ = ["Wild","Lazy","Brave","Sneaky","Cosmic","Neon","Lucky","Silly","Quiet","Witty","Funky","Sleepy","Royal","Spicy","Hyper","Mellow","Tiny","Mighty","Frosty","Sunny"];
+  const ANI = ["Otter","Falcon","Panda","Fox","Tiger","Whale","Lemur","Koala","Heron","Bison","Crow","Moth","Newt","Yak","Pug","Eel","Owl","Boar","Hare","Quokka"];
+  const COLORS = ["#60a5fa","#22d3ee","#2dd4bf","#34d399","#a78bfa","#e879f9","#f472b6","#fb7185","#fb923c","#facc15","#a3e635","#94a3b8","#818cf8","#c084fc","#38bdf8"];
+
+  const rnd = a => a[Math.floor(Math.random()*a.length)];
+  const randomName = () => rnd(ADJ)+" "+rnd(ANI);
+
+  const me = {
+    name: randomName(),
+    color: rnd(COLORS),
+    id: Math.random().toString(36).slice(2,10),
+    dev: false
+  };
+
+  const DEV_IP_HASHES = new Set([
+    "421c8ae2"
+  ]);
+  const DEV_NICK = "Still";
+
+  // ----- IP-based identity (no localStorage/cookies; data lives in our own RTDB) -----
+  // We hash the IP before storing so we never write a raw address to the DB.
+  async function sha256Hex(str){
+    try{
+      const buf = new TextEncoder().encode(str);
+      const h = await crypto.subtle.digest("SHA-256", buf);
+      return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    }catch(e){
+      // fallback: simple deterministic hash
+      let h=2166136261>>>0;
+      for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); }
+      return (h>>>0).toString(16).padStart(8,"0");
+    }
+  }
+  async function fetchIPHash(){
+    try{
+      const r = await fetch(IP_API, { cache:"no-store" });
+      if(!r.ok) return null;
+      const j = await r.json();
+      if(!j || !j.ip) return null;
+      return await sha256Hex(j.ip);
+    }catch(e){ return null; }
+  }
+  let ipHash = null;
+  let ipConsent = null; // null = unknown, true = allowed, false = denied
+  async function loadIdentityByIP(){
+    if(!ipHash || ipConsent !== true) return null;
+    try{
+      const r = await fetch(`${DB}${IPS_PATH}/${ipHash}.json`);
+      if(!r.ok) return null;
+      return await r.json();
+    }catch(e){ return null; }
+  }
+  async function saveIdentityByIP(){
+    if(!ipHash || ipConsent !== true) return;
+    try{
+      await fetch(`${DB}${IPS_PATH}/${ipHash}.json`, {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ nick: me.name, color: me.color, uid: me.id, dev: !!me.dev, ts: Date.now() })
+      });
+    }catch(e){}
+  }
+
+  // ----- IndexedDB persistence (localStorage doesn't work in this WebView) -----
+  const DBNAME = "nanochat", STORE = "kv";
+  function idbOpen(){
+    return new Promise((res,rej)=>{
+      const r = indexedDB.open(DBNAME, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbGet(k){
+    try{
+      const db = await idbOpen();
+      return await new Promise((res,rej)=>{
+        const tx = db.transaction(STORE,"readonly").objectStore(STORE).get(k);
+        tx.onsuccess = () => res(tx.result);
+        tx.onerror = () => rej(tx.error);
+      });
+    }catch(e){ return null; }
+  }
+  async function idbSet(k,v){
+    try{
+      const db = await idbOpen();
+      return await new Promise((res,rej)=>{
+        const tx = db.transaction(STORE,"readwrite").objectStore(STORE).put(v,k);
+        tx.onsuccess = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    }catch(e){}
+  }
+
+  const $meName = document.getElementById("meName");
+  function refreshMeBadge(){
+    $meName.textContent = me.name;
+    $meName.style.color = me.color;
+    if(me.dev){
+      const tag = document.createElement("span");
+      tag.className = "devtag";
+      tag.textContent = "DEV";
+      $meName.appendChild(tag);
+    }
+  }
+  refreshMeBadge();
+
+  const $msgs = document.getElementById("messages");
+  const $wrap = document.getElementById("msgs-wrap");
+  const $input = document.getElementById("input");
+  const $send = document.getElementById("send");
+  const $online = document.getElementById("online");
+  const $active = document.getElementById("active");
+  const $status = document.getElementById("status");
+  const $typing = document.getElementById("typing");
+
+  // Optimistic active count: show "1" (just me) immediately, replaced when server data arrives
+  let realActiveCount = null;
+  function renderActive(){
+    const n = realActiveCount === null ? 1 : realActiveCount;
+    $active.textContent = n + (n === 1 ? " online" : " online");
+    $active.classList.toggle("loading", realActiveCount === null);
+  }
+  renderActive();
+
+  let seen = new Set();
+  let pending = []; // optimistic messages awaiting server echo: {uid,ts,text,el}
+  let lastFetchKey = null;
+  let polling = false;
+  let nearBottom = true;
+  let msgIndex = {}; // key -> {el, uid, name}
+  let mutedUids = new Set();
+  let mutedNames = new Set(); // fallback when uid isn't known
+
+  $msgs.addEventListener("scroll", () => {
+    nearBottom = ($msgs.scrollHeight - $msgs.scrollTop - $msgs.clientHeight) < 60;
+  });
+
+  function showStatus(t){
+    $status.textContent = t;
+    $status.classList.add("show");
+    clearTimeout(showStatus._t);
+    showStatus._t = setTimeout(()=>$status.classList.remove("show"), 1800);
+  }
+
+  function colorFor(name){
+    let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0;
+    return COLORS[h % COLORS.length];
+  }
+
+  function timeStr(ts){
+    const d = new Date(ts);
+    const hh = d.getHours().toString().padStart(2,"0");
+    const mm = d.getMinutes().toString().padStart(2,"0");
+    return hh+":"+mm;
+  }
+
+  function addSys(text, cls){
+    const el = document.createElement("div");
+    el.className = "msg sys" + (cls ? " "+cls : "");
+    el.textContent = text;
+    const ts = Date.now();
+    el.dataset.born = String(ts);
+    insertByTime(el, ts);
+    if(nearBottom) requestAnimationFrame(()=>{ $msgs.scrollTop = $msgs.scrollHeight; });
+    return el;
+  }
+
+  // The Nanogram WebView intercepts window.open / _system / _blank and just renders
+  // the page inline. To truly escape we have to navigate the TOP frame to a
+  // URI scheme the OS will catch before the WebView loads it:
+  //   - Android: intent:// with S.browser_fallback_url= forces Chrome.
+  //   - iOS:    discord:// is caught by the Discord app; for the browser there is
+  //             no equivalent forced-escape, so we offer copy-to-clipboard.
+  function isAndroid(){ return /android/i.test(navigator.userAgent); }
+  function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+
+  async function copyToClipboard(t){
+    try{ await navigator.clipboard.writeText(t); return true; }catch(e){}
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = t; ta.style.cssText="position:fixed;left:-9999px;top:0";
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e){ return false; }
+  }
+
+  async function openExternal(httpsUrl){
+    const ok = await copyToClipboard(httpsUrl);
+    showStatus(ok ? "Copied!" : "Couldn't copy: "+httpsUrl);
+  }
+  // bind clicks on any link inside the chat to openExternal
+  function bindExternalLinks(root){
+    root.querySelectorAll("a[data-ext]").forEach(a => {
+      if(a._bound) return; a._bound = true;
+      a.addEventListener("click", (e)=>{
+        e.preventDefault();
+        openExternal(a.dataset.ext);
+      });
+    });
+  }
+
+  function renderWelcome(){
+    if(document.getElementById("welcomeMsg")) return;
+    const el = document.createElement("div");
+    el.id = "welcomeMsg";
+    el.className = "msg sys welcome";
+    el.innerHTML = "<b>👋 Welcome to Nano Global Chat</b><br>" +
+      "A real-time chat shared with everyone on Nanogram. Pick a nickname, send messages or GIFs, tap any message to reply, and customize your theme from the <b>+</b> menu. Messages are limited to 240 characters.<br>" +
+      "Join the official Nanogram Discord: <a href=\"https://discord.gg/nanogram\" data-ext=\"https://discord.gg/nanogram\" data-app=\"discord://invite/nanogram\" target=\"_system\" rel=\"noopener\">discord.gg/nanogram</a>";
+    // pin at top
+    if($wrap.firstChild) $wrap.insertBefore(el, $wrap.firstChild);
+    else $wrap.appendChild(el);
+    bindExternalLinks(el);
+  }
+
+  // shown every session, right under the welcome card
+  function renderDiscordJoin(){
+    if(document.getElementById("discordJoin")) return;
+    const el = document.createElement("div");
+    el.id = "discordJoin";
+    el.className = "msg sys discord";
+    el.innerHTML = "Join the official Nanogram Discord → <a href=\"https://discord.gg/nanogram\" data-ext=\"https://discord.gg/nanogram\" data-app=\"discord://invite/nanogram\" target=\"_system\" rel=\"noopener\">discord.gg/nanogram</a>";
+    const welcome = document.getElementById("welcomeMsg");
+    if(welcome && welcome.nextSibling) $wrap.insertBefore(el, welcome.nextSibling);
+    else if(welcome) $wrap.appendChild(el);
+    else if($wrap.firstChild) $wrap.insertBefore(el, $wrap.firstChild);
+    else $wrap.appendChild(el);
+    bindExternalLinks(el);
+  }
+
+  // remove "X joined" messages after 5 minutes
+  const JOIN_TTL = 5 * 60 * 1000;
+  function pruneOldJoins(){
+    const now = Date.now();
+    const kids = Array.from($wrap.querySelectorAll(".msg.sys.join"));
+    for(const el of kids){
+      const born = parseInt(el.dataset.born || "0", 10);
+      if(born && (now - born) > JOIN_TTL){
+        el.parentNode && el.parentNode.removeChild(el);
+      }
+    }
+  }
+  setInterval(pruneOldJoins, 30000);
+  // also run pruning shortly after load to clean any stale joins
+  setTimeout(pruneOldJoins, 2000);
+
+  function isMuted(m){
+    if(!m) return false;
+    if(m.uid && mutedUids.has(m.uid)) return true;
+    if(m.name && mutedNames.has(m.name)) return true;
+    return false;
+  }
+
+  function applyMuteVisibility(){
+    for(const k in msgIndex){
+      const rec = msgIndex[k];
+      if(!rec || !rec.el) continue;
+      const muted = (rec.uid && mutedUids.has(rec.uid)) || (rec.name && mutedNames.has(rec.name));
+      rec.el.classList.toggle("muted-hidden", !!muted && rec.uid !== me.id);
+    }
+  }
+
+  function insertByTime(el, ts){
+    // insert el into $wrap so children remain sorted by ts ascending.
+    // pinned cards (welcome / discordJoin) always stay first.
+    ts = ts || Date.now();
+    el.dataset.ts = String(ts);
+    const kids = $wrap.children;
+    // walk from end backward — most inserts are near the end (newest)
+    let anchor = null;
+    for(let i = kids.length - 1; i >= 0; i--){
+      const c = kids[i];
+      if(c.id === "welcomeMsg" || c.id === "discordJoin"){ anchor = c.nextSibling; break; }
+      const cts = parseInt(c.dataset.ts || c.dataset.born || "0", 10);
+      if(cts <= ts){ anchor = c.nextSibling; break; }
+      anchor = c;
+    }
+    if(anchor) $wrap.insertBefore(el, anchor);
+    else $wrap.appendChild(el);
+  }
+
+  function addMsg(key, m){
+    if(seen.has(key)) return;
+    // dedupe server echo of an optimistic local message
+    if(key && key[0] !== "_"){
+      for(let i=0;i<pending.length;i++){
+        const p = pending[i];
+        const same = (p.text === m.text) && ((p.gif||"") === (m.gif||""));
+        if(p.uid === m.uid && same && Math.abs((m.ts||0) - p.ts) < 15000){
+          // adopt: mark the real key as seen, drop the pending entry, don't render again
+          seen.add(key);
+          // also update the optimistic element's key so reply targeting works
+          if(p.el){ p.el.dataset.key = key; msgIndex[key] = { el:p.el, uid:m.uid, name:m.name, ts:m.ts||Date.now() }; }
+          pending.splice(i,1);
+          return;
+        }
+      }
+    }
+    seen.add(key);
+    const el = document.createElement("div");
+    const mine = m.uid === me.id;
+    el.className = "msg " + (mine ? "me" : "them");
+    el.dataset.key = key;
+    if(!mine){
+      const who = document.createElement("div");
+      who.className = "who";
+      who.style.color = m.color || colorFor(m.name||"?");
+      who.textContent = m.name || "anon";
+      if(m.dev){
+        const tag = document.createElement("span");
+        tag.className = "devtag";
+        tag.textContent = "DEV";
+        who.appendChild(tag);
+      }
+      const tm = document.createElement("span");
+      tm.className = "time";
+      tm.textContent = timeStr(m.ts||Date.now());
+      who.appendChild(tm);
+      el.appendChild(who);
+    }
+    if(m.type === "sys"){
+      el.className = "msg sys";
+      if(m.dev) el.classList.add("dev-join");
+      while(el.firstChild) el.removeChild(el.firstChild);
+      el.textContent = m.text || "";
+      el.dataset.born = String(m.ts || Date.now());
+      // legacy "joined" sys messages from server: tag them so they auto-expire
+      if(/joined the chat/i.test(m.text||"")) el.classList.add("join");
+      insertByTime(el, m.ts || Date.now());
+      prune();
+      if(nearBottom) requestAnimationFrame(()=>{ $msgs.scrollTop = $msgs.scrollHeight; });
+      return;
+    }
+    // reply quote
+    if(m.replyTo && m.replyTo.name){
+      const q = document.createElement("div");
+      q.className = "quote";
+      const qn = document.createElement("span"); qn.className = "qn"; qn.textContent = m.replyTo.name;
+      const qt = document.createElement("span"); qt.className = "qt";
+      qt.textContent = m.replyTo.gif ? "📷 GIF" : (m.replyTo.text || "");
+      q.appendChild(qn); q.appendChild(qt);
+      if(m.replyTo.key){
+        q.addEventListener("click",(ev)=>{
+          ev.preventDefault(); ev.stopPropagation();
+          const target = msgIndex[m.replyTo.key];
+          if(target && target.el){
+            target.el.scrollIntoView({behavior:"smooth", block:"center"});
+            target.el.classList.add("dev-target");
+            setTimeout(()=>target.el.classList.remove("dev-target"), 1200);
+          }
+        });
+      }
+      el.appendChild(q);
+    }
+    const body = document.createElement("div");
+    if(m.type === "gif" && m.gif){
+      el.classList.add("gif-msg");
+      const img = document.createElement("img");
+      img.className = "gif-img";
+      img.src = m.gif;
+      img.alt = "gif";
+      img.loading = "lazy";
+      img.onload = () => { if(nearBottom) $msgs.scrollTop = $msgs.scrollHeight; };
+      body.appendChild(img);
+    } else {
+      body.textContent = m.text || "";
+    }
+    el.appendChild(body);
+    if(mine){
+      const tm = document.createElement("div");
+      tm.className = "time";
+      tm.style.textAlign="right";
+      tm.style.marginTop="2px";
+      tm.textContent = timeStr(m.ts||Date.now());
+      el.appendChild(tm);
+    }
+    insertByTime(el, m.ts || Date.now());
+
+    // tap any message to open the actions sheet (Reply for all; Delete/Mute for devs)
+    if(key && key[0] !== "_"){
+      el.addEventListener("click", (ev)=>{
+        ev.preventDefault();
+        openActionSheet(key, m, el);
+      });
+    }
+
+    // register & apply mute
+    msgIndex[key] = { el, uid: m.uid, name: m.name, ts: m.ts||Date.now() };
+    const muted = (m.uid && mutedUids.has(m.uid)) || (m.name && mutedNames.has(m.name));
+    if(muted && m.uid !== me.id) el.classList.add("muted-hidden");
+
+    prune();
+    if(nearBottom) requestAnimationFrame(()=>{ $msgs.scrollTop = $msgs.scrollHeight; });
+  }
+
+  function prune(){
+    while($wrap.children.length > 121){
+      const gone = $wrap.firstChild;
+      if(gone && (gone.id === "welcomeMsg" || gone.id === "discordJoin")){
+        const next = gone.nextSibling;
+        if(!next) break;
+        if(next.dataset && next.dataset.key) delete msgIndex[next.dataset.key];
+        $wrap.removeChild(next);
+        continue;
+      }
+      if(gone && gone.dataset && gone.dataset.key) delete msgIndex[gone.dataset.key];
+      $wrap.removeChild(gone);
+    }
+  }
+
+  // ----- Firebase REST -----
+  // Query last N messages ordered by key (push IDs are time-sortable)
+  async function fetchRecent(){
+    const url = `${DB}${PATH}.json?orderBy=%22%24key%22&limitToLast=${LIMIT}`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("fetch "+r.status);
+    return r.json();
+  }
+  async function fetchSince(lastKey){
+    // get messages with key > lastKey
+    const url = `${DB}${PATH}.json?orderBy=%22%24key%22&startAt=%22${encodeURIComponent(lastKey)}%22&limitToFirst=50`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("fetch "+r.status);
+    return r.json();
+  }
+  async function pushMessage(m){
+    const url = `${DB}${PATH}.json`;
+    const r = await fetch(url, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(m)
+    });
+    if(!r.ok) throw new Error("send "+r.status);
+    return r.json();
+  }
+
+  // ----- presence (heartbeat + active count) -----
+  async function writeHeartbeat(){
+    try{
+      const url = `${DB}${PRESENCE}/${me.id}.json`;
+      await fetch(url, {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ ts: Date.now(), name: me.name, dev: !!me.dev })
+      });
+    }catch(e){}
+  }
+  async function fetchActiveCount(){
+    try{
+      const url = `${DB}${PRESENCE}.json`;
+      const r = await fetch(url);
+      if(!r.ok) return;
+      const data = await r.json();
+      const now = Date.now();
+      const currentUids = new Set();
+      if(data){
+        for(const k in data){
+          const v = data[k];
+          if(v && typeof v.ts === "number" && (now - v.ts) < PRESENCE_TTL){
+            currentUids.add(k);
+            // newcomer: someone we hadn't seen on the previous tick
+            if(presenceInitialized && !knownUids.has(k) && k !== me.id){
+              const nm = v.name || "Someone";
+              const isDev = !!v.dev;
+              addSys((isDev ? "⚡ " : "") + nm + (isDev ? " [DEV]" : "") + " joined the chat", "join");
+            }
+          }
+        }
+      }
+      // always count ourselves exactly once (we may not have written a heartbeat
+      // yet on the very first tick, or our last heartbeat may be older than TTL)
+      currentUids.add(me.id);
+      knownUids = currentUids;
+      presenceInitialized = true;
+      realActiveCount = currentUids.size;
+      renderActive();
+    }catch(e){}
+  }
+  let lastHeartbeat = 0;
+  let lastActiveFetch = 0;
+  async function maybeHeartbeat(force){
+    const now = Date.now();
+    if(force || (now - lastHeartbeat) >= HEARTBEAT_MS){
+      lastHeartbeat = now;
+      await writeHeartbeat();
+    }
+  }
+  async function maybeFetchActive(force){
+    const now = Date.now();
+    if(force || (now - lastActiveFetch) >= 5000){
+      lastActiveFetch = now;
+      await fetchActiveCount();
+    }
+  }
+  function startPresence(){
+    // write our heartbeat FIRST, then fetch — guarantees we appear in the count
+    // and any stale presence entries from a previous session under the same uid
+    // get overwritten before the first read.
+    maybeHeartbeat(true).then(() => maybeFetchActive(true));
+    // primary timers (may be throttled by the WebView during scroll/background)
+    setInterval(()=>maybeHeartbeat(false), HEARTBEAT_MS);
+    setInterval(()=>maybeFetchActive(false), 5000);
+    // recovery: if the user scrolls, taps, or the page becomes visible again,
+    // immediately catch up on any missed heartbeat / active-count fetch.
+    const kick = () => { maybeHeartbeat(false); maybeFetchActive(false); };
+    $msgs.addEventListener("scroll", kick, { passive:true });
+    document.addEventListener("touchstart", kick, { passive:true });
+    document.addEventListener("visibilitychange", () => {
+      if(!document.hidden) maybeHeartbeat(true);
+      kick();
+    });
+    window.addEventListener("focus", () => maybeHeartbeat(true));
+  }
+
+  // ----- typing indicator -----
+  let lastTypingWrite = 0;
+  let typingClearTimer = null;
+  async function writeTyping(){
+    try{
+      const url = `${DB}${TYPING}/${me.id}.json`;
+      await fetch(url, {
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ ts: Date.now(), name: me.name })
+      });
+      lastTypingWrite = Date.now();
+    }catch(e){}
+  }
+  async function clearTyping(){
+    try{
+      const url = `${DB}${TYPING}/${me.id}.json`;
+      await fetch(url, { method:"DELETE" });
+      lastTypingWrite = 0;
+    }catch(e){}
+  }
+  let typingRepingTimer = null;
+  function noteTypingActivity(){
+    const now = Date.now();
+    if(now - lastTypingWrite > TYPING_PING_MS) writeTyping();
+    clearTimeout(typingClearTimer);
+    typingClearTimer = setTimeout(clearTyping, TYPING_IDLE_CLEAR);
+    // keep re-asserting typing on the server while text remains, even during pauses
+    if(!typingRepingTimer){
+      typingRepingTimer = setInterval(() => {
+        if($input.value.trim().length > 0){
+          writeTyping();
+        } else {
+          clearInterval(typingRepingTimer);
+          typingRepingTimer = null;
+        }
+      }, TYPING_PING_MS);
+    }
+  }
+  function stopTypingReping(){
+    if(typingRepingTimer){ clearInterval(typingRepingTimer); typingRepingTimer = null; }
+  }
+  function renderTyping(names){
+    if(!names.length){
+      $typing.classList.remove("show");
+      $typing.innerHTML = "";
+      return;
+    }
+    let label;
+    if(names.length === 1) label = `${names[0]} is typing`;
+    else if(names.length === 2) label = `${names[0]}, ${names[1]} are typing`;
+    else if(names.length <= 4) label = `${names.slice(0,-1).join(", ")}, ${names[names.length-1]} are typing`;
+    else label = `${names.slice(0,3).join(", ")} and ${names.length-3} others are typing`;
+    $typing.innerHTML = "";
+    const txt = document.createElement("span");
+    txt.textContent = label;
+    const dots = document.createElement("span");
+    dots.className = "dots";
+    dots.innerHTML = "<span></span><span></span><span></span>";
+    $typing.appendChild(txt);
+    $typing.appendChild(dots);
+    $typing.classList.add("show");
+  }
+  async function fetchTyping(){
+    try{
+      const url = `${DB}${TYPING}.json`;
+      const r = await fetch(url);
+      if(!r.ok) return;
+      const data = await r.json();
+      const now = Date.now();
+      const names = [];
+      if(data){
+        for(const k in data){
+          if(k === me.id) continue;
+          const v = data[k];
+          if(v && typeof v.ts === "number" && (now - v.ts) < TYPING_TTL && v.name){
+            names.push(v.name);
+          }
+        }
+      }
+      renderTyping(names);
+    }catch(e){}
+  }
+  function startTyping(){
+    fetchTyping();
+    setInterval(fetchTyping, 1500);
+  }
+
+  // ----- dev actions: delete, mute, reset -----
+  let deletedKeys = new Set();
+  let resetCutoff = 0;
+
+  function applyDelete(key){
+    deletedKeys.add(key);
+    const rec = msgIndex[key];
+    if(rec && rec.el && rec.el.parentNode){
+      rec.el.parentNode.removeChild(rec.el);
+      delete msgIndex[key];
+    }
+  }
+
+  async function fetchDeleted(){
+    try{
+      const url = `${DB}${DELETED}.json`;
+      const r = await fetch(url);
+      if(!r.ok) return;
+      const data = await r.json();
+      if(!data) return;
+      for(const k in data){
+        if(!deletedKeys.has(k)) applyDelete(k);
+      }
+    }catch(e){}
+  }
+
+  async function fetchResetCutoff(){
+    try{
+      const url = `${DB}/resetAt.json`;
+      const r = await fetch(url);
+      if(!r.ok) return;
+      const v = await r.json();
+      if(typeof v === "number" && v > resetCutoff){
+        resetCutoff = v;
+        // wipe local UI of messages older than cutoff
+        const kids = Array.from($wrap.children);
+        for(const c of kids){
+          const k = c.dataset && c.dataset.key;
+          if(!k) continue;
+          const rec = msgIndex[k];
+          if(!rec) continue;
+          // we don't store ts in msgIndex — just nuke everything pre-reset by removing all rendered for simplicity
+        }
+        // simpler: clear all messages and reload from server (which will skip < cutoff)
+        $wrap.innerHTML = "";
+        msgIndex = {};
+        seen = new Set();
+        lastFetchKey = null;
+        renderWelcome();
+        renderDiscordJoin();
+        addSys("Chat history was reset", "join");
+        try{
+          const data = await fetchRecent();
+          if(data) ingest(data);
+        }catch(e){}
+      }
+    }catch(e){}
+  }
+
+  async function devDeleteMessage(key){
+    try{
+      // mark deleted (so other clients hide it)
+      await fetch(`${DB}${DELETED}/${encodeURIComponent(key)}.json`, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(true)
+      });
+      // remove the actual message
+      await fetch(`${DB}${PATH}/${encodeURIComponent(key)}.json`, { method:"DELETE" });
+      applyDelete(key);
+      showStatus("Message deleted");
+    }catch(e){
+      showStatus("Delete failed");
+    }
+  }
+
+  async function devToggleMute(uid, name){
+    if(!uid && !name) return;
+    const key = uid || name;
+    const wasMuted = (uid && mutedUids.has(uid)) || (name && mutedNames.has(name));
+    if(wasMuted){
+      if(uid) mutedUids.delete(uid);
+      if(name) mutedNames.delete(name);
+      showStatus("Unmuted "+(name||uid));
+    } else {
+      if(uid) mutedUids.add(uid);
+      if(name) mutedNames.add(name);
+      showStatus("Muted "+(name||uid));
+    }
+    await idbSet("mutedUids", Array.from(mutedUids));
+    await idbSet("mutedNames", Array.from(mutedNames));
+    applyMuteVisibility();
+  }
+
+  async function devResetChat(){
+    try{
+      const now = Date.now();
+      // bump reset cutoff so other clients clear too
+      await fetch(`${DB}/resetAt.json`, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify(now)
+      });
+      // wipe messages, deleted-list, presence, and typing
+      await fetch(`${DB}${PATH}.json`, { method:"DELETE" });
+      await fetch(`${DB}${DELETED}.json`, { method:"DELETE" });
+      await fetch(`${DB}${TYPING}.json`, { method:"DELETE" });
+      await fetch(`${DB}${PRESENCE}.json`, { method:"DELETE" });
+      resetCutoff = now;
+      $wrap.innerHTML = "";
+      msgIndex = {};
+      seen = new Set();
+      lastFetchKey = null;
+      deletedKeys = new Set();
+      knownUids = new Set();
+      presenceInitialized = false;
+      renderWelcome();
+      renderDiscordJoin();
+      addSys("Chat history was reset by DEV", "join");
+      writeHeartbeat();
+      showStatus("Chat reset");
+    }catch(e){
+      showStatus("Reset failed: "+(e.message||e));
+    }
+  }
+
+  // unified action sheet — Reply for everyone, Delete/Mute for dev only
+  const $devSheet = document.getElementById("devSheet");
+  const $devTitle = document.getElementById("devTitle");
+  const $devInfo = document.getElementById("devInfo");
+  const $devPreview = document.getElementById("devPreview");
+  const $devReply = document.getElementById("devReply");
+  const $devDel = document.getElementById("devDel");
+  const $devMute = document.getElementById("devMute");
+  const $devCancel = document.getElementById("devCancel");
+  let devCurrent = null;
+
+  // reply state
+  const $replyBar = document.getElementById("replyBar");
+  const $replyName = document.getElementById("replyName");
+  const $replyText = document.getElementById("replyText");
+  const $replyCancel = document.getElementById("replyCancel");
+  let replyContext = null; // {key,name,text,gif,uid}
+  function startReply(key, m){
+    replyContext = {
+      key,
+      uid: m.uid,
+      name: m.name || "anon",
+      text: m.type === "gif" ? "" : (m.text||""),
+      gif: m.type === "gif"
+    };
+    $replyName.textContent = replyContext.name;
+    $replyText.textContent = replyContext.gif ? "📷 GIF" : (replyContext.text || "");
+    $replyBar.classList.add("show");
+    setTimeout(()=>$input.focus(), 50);
+  }
+  function clearReply(){
+    replyContext = null;
+    $replyBar.classList.remove("show");
+  }
+  $replyCancel.addEventListener("click",(e)=>{ e.preventDefault(); clearReply(); });
+
+  function openActionSheet(key, m, el){
+    devCurrent = { key, m, el };
+    $devTitle.textContent = me.dev ? "Message actions" : "Message";
+    $devInfo.textContent = "From " + (m.name||"anon");
+    $devPreview.textContent = m.type === "gif" ? "[GIF]" : (m.text || "(empty)");
+    if(me.dev){
+      $devDel.style.display = "";
+      $devMute.style.display = "";
+      const muted = (m.uid && mutedUids.has(m.uid)) || (m.name && mutedNames.has(m.name));
+      $devMute.textContent = muted ? "Unmute user" : "Mute user";
+    } else {
+      $devDel.style.display = "none";
+      $devMute.style.display = "none";
+    }
+    document.querySelectorAll(".msg.dev-target").forEach(x=>x.classList.remove("dev-target"));
+    if(el) el.classList.add("dev-target");
+    $devSheet.classList.add("show");
+  }
+  function closeDevSheet(){
+    $devSheet.classList.remove("show");
+    document.querySelectorAll(".msg.dev-target").forEach(x=>x.classList.remove("dev-target"));
+    devCurrent = null;
+  }
+  $devCancel.addEventListener("click",(e)=>{ e.preventDefault(); closeDevSheet(); });
+  $devSheet.addEventListener("click",(e)=>{ if(e.target === $devSheet) closeDevSheet(); });
+  $devReply.addEventListener("click",(e)=>{
+    e.preventDefault();
+    if(!devCurrent) return;
+    const { key, m } = devCurrent;
+    closeDevSheet();
+    startReply(key, m);
+  });
+  $devDel.addEventListener("click",(e)=>{
+    e.preventDefault();
+    if(!devCurrent) return;
+    const k = devCurrent.key;
+    closeDevSheet();
+    devDeleteMessage(k);
+  });
+  $devMute.addEventListener("click",(e)=>{
+    e.preventDefault();
+    if(!devCurrent) return;
+    const m = devCurrent.m;
+    closeDevSheet();
+    devToggleMute(m.uid, m.name);
+  });
+
+  // reset button
+  const $resetBtn = document.getElementById("resetBtn");
+  const $devSect = document.getElementById("devSect");
+  let resetArmed = false;
+  $resetBtn.addEventListener("click",(e)=>{
+    e.preventDefault();
+    if(!resetArmed){
+      resetArmed = true;
+      $resetBtn.textContent = "⚠ Tap again to confirm";
+      $resetBtn.classList.add("confirming");
+      setTimeout(()=>{
+        resetArmed = false;
+        $resetBtn.textContent = "🗑 Reset entire chat history";
+        $resetBtn.classList.remove("confirming");
+      }, 4000);
+      return;
+    }
+    resetArmed = false;
+    $resetBtn.textContent = "🗑 Reset entire chat history";
+    $resetBtn.classList.remove("confirming");
+    devResetChat();
+  });
+
+  function refreshDevUI(){
+    $devSect.classList.toggle("show", !!me.dev);
+    document.body.classList.toggle("is-dev", !!me.dev);
+  }
+
+  let announced = false;
+  async function announceJoin(){
+    // join announcements are now client-side only (rendered when other clients see our presence)
+    announced = true;
+  }
+
+  // track which UIDs we've seen in presence so we can announce newcomers locally
+  let knownUids = new Set();
+  let presenceInitialized = false;
+
+  function ingest(obj){
+    if(!obj) return;
+    // sort entries by key (push IDs lexicographically = chronologically)
+    const entries = Object.entries(obj).sort((a,b)=>a[0]<b[0]?-1:1);
+    for(const [k,v] of entries){
+      if(!v || typeof v !== "object") continue;
+      if(deletedKeys.has(k)) continue;
+      if(resetCutoff && typeof v.ts === "number" && v.ts < resetCutoff) continue;
+      addMsg(k, v);
+      if(!lastFetchKey || k > lastFetchKey) lastFetchKey = k;
+    }
+  }
+
+  async function initLoad(){
+    try{
+      const ok = await resolveDB();
+      if(!ok) throw new Error("no reachable database URL");
+      const data = await fetchRecent();
+      $online.textContent = "● Connected";
+      $online.style.color = "#22c55e";
+      if(data){
+        ingest(data);
+      }
+      $msgs.scrollTop = $msgs.scrollHeight;
+      startPresence();
+      startTyping();
+      fetchDeleted();
+      fetchResetCutoff();
+      setInterval(fetchDeleted, 4000);
+      setInterval(fetchResetCutoff, 6000);
+      announceJoin();
+      poll();
+    }catch(e){
+      $online.textContent = "Offline";
+      $online.style.color = "#e11d48";
+      addSys("Couldn't reach the server ("+(e.message||e)+"). Retrying…");
+      setTimeout(initLoad, 3000);
+    }
+  }
+
+  // long-poll loop: fetch new messages since lastFetchKey every ~1.5s
+  async function poll(){
+    if(polling) return;
+    polling = true;
+    while(true){
+      try{
+        if(lastFetchKey){
+          const data = await fetchSince(lastFetchKey);
+          if(data){
+            // startAt is inclusive, so we may receive lastFetchKey itself — that's fine, seen-set filters it
+            ingest(data);
+          }
+        } else {
+          const data = await fetchRecent();
+          if(data) ingest(data);
+        }
+        $online.textContent = "● Connected";
+        $online.style.color = "#22c55e";
+      }catch(e){
+        $online.textContent = "Reconnecting…";
+        $online.style.color = "#ca8a04";
+      }
+      await new Promise(r=>setTimeout(r, 1500));
+    }
+  }
+
+  async function send(){
+    const text = $input.value.trim();
+    if(!text) return;
+    if(text.length > MAX_CHARS) return;
+    $input.value = "";
+    updateCharCount();
+    $send.disabled = true;
+    clearTimeout(typingClearTimer);
+    stopTypingReping();
+    clearTyping();
+    const m = { text, name: me.name, color: me.color, uid: me.id, ts: Date.now() };
+    if(me.dev) m.dev = true;
+    if(replyContext){
+      m.replyTo = {
+        key: replyContext.key,
+        name: replyContext.name,
+        text: replyContext.text || "",
+        gif: replyContext.gif ? 1 : 0
+      };
+    }
+    clearReply();
+    // optimistic: render immediately with temp key
+    const tempKey = "_local_"+Date.now()+"_"+Math.random();
+    addMsg(tempKey, m);
+    const optEl = msgIndex[tempKey] && msgIndex[tempKey].el;
+    pending.push({ uid:m.uid, ts:m.ts, text:m.text, el: optEl });
+    nearBottom = true;
+    $msgs.scrollTop = $msgs.scrollHeight;
+    try{
+      await pushMessage(m);
+    }catch(e){
+      addSys("Message failed to send");
+    }
+    $send.disabled = false;
+    $input.focus();
+  }
+
+  const $charCount = document.getElementById("charCount");
+  const MAX_CHARS = 240;
+  $input.setAttribute("maxlength", String(MAX_CHARS));
+  function updateCharCount(){
+    const len = $input.value.length;
+    $charCount.textContent = len + "/" + MAX_CHARS;
+    $charCount.classList.toggle("show", len > 0);
+    $charCount.classList.toggle("warn", len >= MAX_CHARS * 0.85 && len < MAX_CHARS);
+    $charCount.classList.toggle("over", len >= MAX_CHARS);
+  }
+
+  $send.addEventListener("click", (e)=>{ e.preventDefault(); send(); });
+  $input.addEventListener("keydown", e => { if(e.key === "Enter") { e.preventDefault(); send(); } });
+  $input.addEventListener("input", () => {
+    updateCharCount();
+    if($input.value.trim().length > 0) noteTypingActivity();
+    else { clearTimeout(typingClearTimer); stopTypingReping(); clearTyping(); }
+  });
+  $input.addEventListener("blur", () => { clearTimeout(typingClearTimer); stopTypingReping(); clearTyping(); $charCount.classList.remove("show"); });
+
+  // ----- Nickname modal -----
+  const $modal = document.getElementById("modal");
+  const $nickInput = document.getElementById("nickInput");
+  const $nickSave = document.getElementById("nickSave");
+  const $nickRandom = document.getElementById("nickRandom");
+
+  const $ipHashRow = null;
+  function refreshIpHashRow(){}
+
+  function openNickModal(initial){
+    // initial === "" means brand-new user → leave blank so the random fallback isn't shown as their name
+    $nickInput.value = (initial === undefined) ? me.name : initial;
+    $nickInput.placeholder = "e.g. " + randomName();
+    if(initial && initial !== me.name){
+      // soft hint that we recognized a previous name on this network
+      const sub = document.querySelector("#modal p");
+      if(sub) sub.textContent = "We found a name previously used on this network — feel free to keep it or pick something new.";
+    }
+    $modal.classList.add("show");
+    refreshIpHashRow();
+    setTimeout(()=>$nickInput.focus(), 200);
+  }
+  function closeNickModal(){ $modal.classList.remove("show"); $nickInput.blur(); }
+
+  $nickRandom.addEventListener("click", (e)=>{ e.preventDefault(); $nickInput.value = randomName(); $nickInput.focus(); });
+  let nickResolve = null;
+  $nickSave.addEventListener("click", async (e)=>{
+    e.preventDefault();
+    let raw = ($nickInput.value||"").trim();
+    let n = raw.replace(/\s+/g," ").slice(0,30);
+    if(!n) n = randomName();
+    me.name = n;
+    refreshMeBadge();
+    await idbSet("nick", n);
+    await idbSet("color", me.color);
+    await idbSet("uid", me.id);
+    saveIdentityByIP();
+    closeNickModal();
+    showStatus(me.dev ? "⚡ Saved (DEV)" : "Nickname saved");
+    writeHeartbeat();
+    if(nickResolve){ const r = nickResolve; nickResolve = null; r(); }
+  });
+  $nickInput.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $nickSave.click(); } });
+  $meName.addEventListener("click", ()=> openNickModal(me.name));
+
+  // ----- Theme & background effect -----
+  const THEME_FX_COLORS = {
+    modern:   ["#3b82f6","#6366f1","#06b6d4"],
+    stylized: ["#f472b6","#a855f7","#ec4899"],
+    midnight: ["#0ea5e9","#0369a1","#22d3ee"],
+    sunset:   ["#fb923c","#ef4444","#facc15"],
+    forest:   ["#10b981","#047857","#84cc16"],
+    rose:     ["#fb7185","#be185d","#f472b6"],
+    mono:     ["#94a3b8","#475569","#e2e8f0"]
+  };
+  const $bgFx = document.getElementById("bgFx");
+  let curTheme = "modern", curFx = "none";
+  function applyFxColors(){
+    const c = THEME_FX_COLORS[curTheme] || THEME_FX_COLORS.modern;
+    $bgFx.style.setProperty("--fx1", c[0]);
+    $bgFx.style.setProperty("--fx2", c[1]);
+    $bgFx.style.setProperty("--fx3", c[2]);
+  }
+  function applyTheme(t){
+    curTheme = t;
+    document.body.setAttribute("data-theme", t);
+    document.querySelectorAll(".tcard").forEach(b => b.classList.toggle("sel", b.dataset.theme === t));
+    applyFxColors();
+  }
+  function applyFx(fx){
+    curFx = fx;
+    $bgFx.className = "";
+    if(fx && fx !== "none"){
+      $bgFx.classList.add("on","fx-"+fx);
+    }
+    document.querySelectorAll(".bgcard").forEach(x => x.classList.toggle("sel", x.dataset.fx === fx));
+  }
+  document.querySelectorAll(".tcard").forEach(b => {
+    b.addEventListener("click", (e)=>{
+      e.preventDefault();
+      applyTheme(b.dataset.theme);
+      idbSet("theme", b.dataset.theme);
+    });
+  });
+  document.querySelectorAll(".bgcard").forEach(b => {
+    b.addEventListener("click", (e)=>{
+      e.preventDefault();
+      applyFx(b.dataset.fx);
+      idbSet("fx", b.dataset.fx);
+    });
+  });
+
+  // ----- Media panel (GIFs via Giphy, Video placeholder) -----
+  const GIPHY_KEY = "pCCXEDiEYmtLfuzLXyecl0mzOugJ4Buj";
+  const $plus = document.getElementById("plus");
+  const $media = document.getElementById("media");
+  const $gifGrid = document.getElementById("gifGrid");
+  const $gifSearch = document.getElementById("gifSearch");
+  const $tabs = $media.querySelectorAll(".tab");
+  const $panes = {
+    gif: document.getElementById("gifPane"),
+    theme: document.getElementById("themePane"),
+    settings: document.getElementById("settingsPane")
+  };
+  let currentTab = "gif";
+  let gifReqId = 0;
+  let gifSearchTimer = null;
+
+  function openMedia(){
+    $media.classList.add("open");
+    $plus.classList.add("open");
+    if(currentTab === "gif" && $gifGrid.children.length === 0) loadGifs("");
+  }
+  function closeMedia(){
+    $media.classList.remove("open");
+    $plus.classList.remove("open");
+  }
+  function toggleMedia(){
+    if($media.classList.contains("open")) closeMedia(); else openMedia();
+  }
+
+  $plus.addEventListener("click", (e)=>{ e.preventDefault(); toggleMedia(); });
+
+  $tabs.forEach(t => {
+    t.addEventListener("click", (e)=>{
+      e.preventDefault();
+      currentTab = t.dataset.tab;
+      $tabs.forEach(x => x.classList.toggle("active", x === t));
+      Object.keys($panes).forEach(k => $panes[k].classList.toggle("active", k === currentTab));
+      if(currentTab === "gif" && $gifGrid.children.length === 0) loadGifs($gifSearch.value.trim());
+    });
+  });
+
+  async function loadGifs(q){
+    const myReq = ++gifReqId;
+    $gifGrid.innerHTML = '<div class="empty">Loading…</div>';
+    const endpoint = q
+      ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=24&rating=pg-13&bundle=messaging_non_clips`
+      : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=pg-13&bundle=messaging_non_clips`;
+    try{
+      const r = await fetch(endpoint);
+      if(!r.ok) throw new Error("giphy "+r.status);
+      const j = await r.json();
+      if(myReq !== gifReqId) return; // stale
+      const items = (j.data||[]);
+      if(!items.length){
+        $gifGrid.innerHTML = '<div class="empty">No GIFs found</div>';
+        return;
+      }
+      $gifGrid.innerHTML = "";
+      const cols = document.createElement("div");
+      cols.className = "cols";
+      const colA = document.createElement("div"); colA.className = "col";
+      const colB = document.createElement("div"); colB.className = "col";
+      cols.appendChild(colA); cols.appendChild(colB);
+      $gifGrid.appendChild(cols);
+      let hA = 0, hB = 0; // estimated column heights for masonry balance
+      for(const g of items){
+        const imgs = g.images || {};
+        const preview = (imgs.fixed_width_small && imgs.fixed_width_small.url)
+                    || (imgs.fixed_width && imgs.fixed_width.url)
+                    || (imgs.preview_gif && imgs.preview_gif.url);
+        const full = (imgs.fixed_width && imgs.fixed_width.url)
+                  || (imgs.downsized && imgs.downsized.url)
+                  || (imgs.original && imgs.original.url);
+        if(!preview || !full) continue;
+        const w = parseFloat((imgs.fixed_width_small && imgs.fixed_width_small.width) || (imgs.fixed_width && imgs.fixed_width.width) || 100);
+        const h = parseFloat((imgs.fixed_width_small && imgs.fixed_width_small.height) || (imgs.fixed_width && imgs.fixed_width.height) || 100);
+        const ratio = h / Math.max(w,1);
+        const cell = document.createElement("div");
+        cell.className = "gif";
+        const im = document.createElement("img");
+        im.src = preview;
+        im.alt = g.title || "gif";
+        im.loading = "lazy";
+        cell.appendChild(im);
+        cell.addEventListener("click", (e)=>{ e.preventDefault(); sendGif(full); });
+        if(hA <= hB){ colA.appendChild(cell); hA += ratio; }
+        else        { colB.appendChild(cell); hB += ratio; }
+      }
+    }catch(e){
+      if(myReq !== gifReqId) return;
+      $gifGrid.innerHTML = '<div class="empty">Couldn\'t load GIFs<br><span style="font-size:10px">'+(e.message||e)+'</span></div>';
+    }
+  }
+
+  $gifSearch.addEventListener("input", () => {
+    clearTimeout(gifSearchTimer);
+    const q = $gifSearch.value.trim();
+    gifSearchTimer = setTimeout(()=> loadGifs(q), 350);
+  });
+  $gifSearch.addEventListener("keydown", e => {
+    if(e.key === "Enter"){ e.preventDefault(); clearTimeout(gifSearchTimer); loadGifs($gifSearch.value.trim()); }
+  });
+
+  async function sendGif(url){
+    closeMedia();
+    const m = { type:"gif", gif:url, text:"", name: me.name, color: me.color, uid: me.id, ts: Date.now() };
+    if(me.dev) m.dev = true;
+    if(replyContext){
+      m.replyTo = {
+        key: replyContext.key,
+        name: replyContext.name,
+        text: replyContext.text || "",
+        gif: replyContext.gif ? 1 : 0
+      };
+    }
+    clearReply();
+    const tempKey = "_local_"+Date.now()+"_"+Math.random();
+    addMsg(tempKey, m);
+    const optEl = msgIndex[tempKey] && msgIndex[tempKey].el;
+    pending.push({ uid:m.uid, ts:m.ts, text:"", gif:url, el: optEl });
+    nearBottom = true;
+    requestAnimationFrame(()=>{ $msgs.scrollTop = $msgs.scrollHeight; });
+    try{ await pushMessage(m); }
+    catch(e){ addSys("GIF failed to send"); }
+  }
+
+  // touch: prevent the input area itself from being swallowed, allow scrolling messages
+  document.addEventListener("touchmove", (e)=>{
+    // allow scroll inside scrollable areas
+    const themePane = document.getElementById("themePane");
+    if(!$msgs.contains(e.target) && !$gifGrid.contains(e.target) && !themePane.contains(e.target)) e.preventDefault();
+  }, { passive:false });
+
+  // ensure input stays visible when keyboard opens (iOS)
+  $input.addEventListener("focus", ()=>{
+    setTimeout(()=>{ $msgs.scrollTop = $msgs.scrollHeight; }, 300);
+  });
+
+  // ----- IP storage consent modal -----
+  const $ipModal = document.getElementById("ipModal");
+  const $ipAllow = document.getElementById("ipAllow");
+  const $ipDeny = document.getElementById("ipDeny");
+  function askIpConsent(){
+    return new Promise(resolve => {
+      $ipModal.classList.add("show");
+      const done = (v) => {
+        $ipModal.classList.remove("show");
+        $ipAllow.removeEventListener("click", onAllow);
+        $ipDeny.removeEventListener("click", onDeny);
+        resolve(v);
+      };
+      const onAllow = (e)=>{ e.preventDefault(); done(true); };
+      const onDeny  = (e)=>{ e.preventDefault(); done(false); };
+      $ipAllow.addEventListener("click", onAllow);
+      $ipDeny.addEventListener("click", onDeny);
+    });
+  }
+
+  // ----- Copy full source code (for export) -----
+  const $ipCopyCode = document.getElementById("ipCopyCode");
+  if($ipCopyCode){
+    $ipCopyCode.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try{
+        const r = await fetch(window.location.href, { cache:"no-store" });
+        const src = await r.text();
+        const ok = await copyToClipboard(src);
+        if(ok){
+          $ipCopyCode.textContent = "✓ Copied " + Math.round(src.length/1024) + " KB";
+          showStatus("Source code copied to clipboard");
+        } else {
+          $ipCopyCode.textContent = "✕ Copy failed";
+          showStatus("Copy failed — clipboard blocked");
+        }
+        setTimeout(()=>{ $ipCopyCode.textContent = "📋 Copy full source code"; }, 2500);
+      }catch(err){
+        // fallback: copy the live DOM if we can't re-fetch the page
+        try{
+          const src = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+          const ok = await copyToClipboard(src);
+          $ipCopyCode.textContent = ok ? "✓ Copied (DOM)" : "✕ Copy failed";
+          showStatus(ok ? "Source code copied (DOM snapshot)" : "Copy failed");
+          setTimeout(()=>{ $ipCopyCode.textContent = "📋 Copy full source code"; }, 2500);
+        }catch(e2){
+          $ipCopyCode.textContent = "✕ Failed: "+(err.message||err);
+          setTimeout(()=>{ $ipCopyCode.textContent = "📋 Copy full source code"; }, 3000);
+        }
+      }
+    });
+  }
+
+  // ----- Settings: IP storage toggle -----
+  const $ipToggle = document.getElementById("ipToggle");
+  function refreshIpToggle(){
+    $ipToggle.setAttribute("aria-checked", ipConsent === true ? "true" : "false");
+  }
+  $ipToggle.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const newVal = !(ipConsent === true);
+    ipConsent = newVal;
+    await idbSet("ipConsent", newVal);
+    refreshIpToggle();
+    if(newVal){
+      if(!ipHash) ipHash = await fetchIPHash();
+      if(ipHash && DEV_IP_HASHES.has(ipHash) && !me.dev){
+        me.dev = true;
+        refreshMeBadge();
+        refreshDevUI();
+        showStatus("⚡ DEV mode unlocked");
+      } else {
+        saveIdentityByIP();
+        showStatus("Enabled · we'll remember you here");
+      }
+    } else {
+      // user revoked — best-effort delete of stored identity
+      if(ipHash){
+        try{ await fetch(`${DB}${IPS_PATH}/${ipHash}.json`, { method:"DELETE" }); }catch(e){}
+      }
+      showStatus("Disabled · we won't remember you");
+    }
+  });
+
+  // ----- startup: load saved identity (or prompt) then connect -----
+  (async () => {
+    // welcome message should be visible immediately, regardless of network
+    renderWelcome();
+    renderDiscordJoin();
+
+    const savedNick  = await idbGet("nick");
+    const savedColor = await idbGet("color");
+    const savedUid   = await idbGet("uid");
+    const savedTheme = await idbGet("theme");
+    const savedFx    = await idbGet("fx");
+    const savedMutedUids  = await idbGet("mutedUids");
+    const savedMutedNames = await idbGet("mutedNames");
+    const savedIpConsent  = await idbGet("ipConsent");
+    if(Array.isArray(savedMutedUids)) mutedUids = new Set(savedMutedUids);
+    if(Array.isArray(savedMutedNames)) mutedNames = new Set(savedMutedNames);
+    applyTheme(savedTheme || "modern");
+    applyFx(savedFx || "none");
+    if(savedUid) me.id = savedUid;
+    else await idbSet("uid", me.id);
+    if(savedColor) me.color = savedColor;
+    else await idbSet("color", me.color);
+
+    // Ask for IP storage consent on first run.
+    if(savedIpConsent === true || savedIpConsent === false){
+      ipConsent = savedIpConsent;
+    } else {
+      ipConsent = await askIpConsent();
+      await idbSet("ipConsent", ipConsent);
+    }
+    refreshIpToggle();
+
+    // Resolve DB (always) and fetch IP hash only if user consented
+    const dbOk = await resolveDB();
+    if(ipConsent === true){
+      ipHash = await fetchIPHash();
+      refreshIpHashRow();
+      // Auto-promote to DEV if this IP hash is in the hard-coded allowlist
+      if(ipHash && DEV_IP_HASHES.has(ipHash)){
+        me.dev = true;
+        if(!savedNick) me.name = DEV_NICK;
+      }
+    }
+    refreshDevUI();
+
+    if(savedNick){
+      // returning user on this exact device: skip prompt entirely
+      me.name = savedNick;
+      refreshMeBadge();
+      initLoad();
+      return;
+    }
+
+    // No local identity. Try IP lookup as a *suggestion* — not auto-applied,
+    // so two people on the same IP can still pick distinct identities.
+    let suggested = null;
+    if(ipHash && dbOk){
+      const identity = await loadIdentityByIP();
+      if(identity && identity.nick) suggested = identity;
+    }
+
+    refreshMeBadge();
+    await new Promise(res => {
+      nickResolve = res;
+      openNickModal(suggested ? suggested.nick : "");
+    });
+    initLoad();
+  })();
+})();
+</script>
+</body>
+</html>
